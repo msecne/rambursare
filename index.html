@@ -168,7 +168,14 @@
         <input type="number" id="ircc" name="ircc" value="5.86" step="0.01" required>
         <label for="margin">Marja (%):</label>
         <input type="number" id="margin" name="margin" value="2.29" step="0.01" required>
-        <label for="insurancePercent">Asigurare (%):</label>
+        <label for="insurancePercent">Asigurare / comision (%):
+            <span class="tooltip-container">
+                <span class="infopoint"
+                    style="font-size: 16px; padding: 0; border: none; background: none; color: #4CAF50; cursor: default; margin-left: 5px; display: inline;">info</span>
+                <span class="tooltip-text">Comision reprezentand asigurarea de viata sau comisionul de administrare
+                    lunara a creditului ca procent din soldul lunar.</span>
+            </span>
+        </label>
         <input type="number" id="insurancePercent" name="insurancePercent" value="0" step="0.01" required>
         <label for="monthlyAdvancePayment">
             Plata anticipata lunara:
