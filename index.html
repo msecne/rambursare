@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plata Anticipata</title>
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2e2e2e;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        th,
+        td {
+            border: 1px solid #555;
+            padding: 10px;
+            text-align: right;
+            word-wrap: break-word;
+        }
+
+        th {
+            background-color: #3a3a3a;
+            color: #4CAF50;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #3f3f3f;
+        }
+
+        tr:hover {
+            background-color: #4a4a4a;
+        }
+
+        form {
+            margin: 20px;
+            background-color: #3a3a3a;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        label {
+            margin: 5px 0;
+            font-size: 14px;
+            display: block;
+        }
+
+        input {
+            border: 1px solid #777;
+            border-radius: 4px;
+            padding: 8px;
+            background-color: #4a4a4a;
+            color: #e0e0e0;
+            font-size: 14px;
+            width: calc(100% - 16px);
+            margin-bottom: 10px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        @media (max-width: 600px) {
+            form {
+                margin: 10px;
+                padding: 10px;
+            }
+
+            label,
+            input,
+            button {
+                font-size: 12px;
+            }
+        }
+
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #4CAF50;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip-container:hover .tooltip-text,
+        .tooltip-container:focus-within .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        select {
+            border: 1px solid #777;
+            border-radius: 4px;
+            padding: 8px;
+            background-color: #4a4a4a;
+            color: #e0e0e0;
+            font-size: 14px;
+            width: calc(100% - 16px);
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <form id="loanForm">
+        <label for="credit">Credit:</label>
+        <input type="number" id="credit" name="credit" value="250000" required>
+        <label for="months">Perioada (luni):</label>
+        <input type="number" id="months" name="months" value="360" required>
+        <label for="fixedRate">Rata fixa (%):</label>
+        <input type="number" id="fixedRate" name="fixedRate" value="5.79" step="0.01" required>
+        <label for="fixedRatePeriod">Perioada rata fixa (luni):</label>
+        <input type="number" id="fixedRatePeriod" name="fixedRatePeriod" value="60" required>
+        <label for="ircc">IRCC (%):</label>
+        <input type="number" id="ircc" name="ircc" value="5.86" step="0.01" required>
+        <label for="margin">Marja (%):</label>
+        <input type="number" id="margin" name="margin" value="2.29" step="0.01" required>
+        <label for="insurancePercent">Asigurare (%):</label>
+        <input type="number" id="insurancePercent" name="insurancePercent" value="0" step="0.01" required>
+        <label for="monthlyAdvancePayment">
+            Plata anticipata lunara:
+            <span class="tooltip-container">
+                <span class="infopoint"
+                    style="font-size: 16px; padding: 0; border: none; background: none; color: #4CAF50; cursor: default; margin-left: 5px; display: inline;">info</span>
+                <span class="tooltip-text">Suma platita anticipat lunar poate creste sau scadea in functie de rata
+                    totala, astfel incat sa se mentina pe cat posibil o rata fixa pe toata perioada creditului.</span>
+            </span>
+        </label>
+        <input type="number" id="monthlyAdvancePayment" name="monthlyAdvancePayment" value="500" required>
+        <label for="calculationType">Tip calcul:</label>
+        <select id="calculationType" name="calculationType" required>
+            <option value="scaderea_perioadei">Scaderea perioadei</option>
+            <option value="scaderea_ratei">Scaderea ratei</option>
+        </select>
+        <div class="button-container">
+            <button type="button" id="calculateButton">Calculeaza</button>
+            <button type="button" id="exportButton">Export to CSV</button>
+        </div>
+    </form>
+    <table id="loanTable">
+    </table>
+
+    <script>
+
+        function calculatePMT(rate, nper, pv) {
+            const r = rate / 12 / 100;
+            return (pv * r * Math.pow(1 + r, nper)) / (Math.pow(1 + r, nper) - 1);
+        }
+
+
+        function calculateRemainingTerm(
+            principal,
+            annualInterestRate,
+            monthlyPayment,
+            extraPayment,
+        ) {
+            const monthlyInterestRate = annualInterestRate / 12 / 100;
+            const newPrincipal = principal - extraPayment;
+            const remainingTerm =
+                Math.log(
+                    monthlyPayment / (monthlyPayment - newPrincipal * monthlyInterestRate),
+                ) / Math.log(1 + monthlyInterestRate);
+            return Math.ceil(remainingTerm);
+        }
+
+        function calculateRemainingBalance(rate, nper, pv, paymentsMade) {
+            const monthlyRate = rate / 12 / 100;
+            const monthlyPayment = calculatePMT(rate, nper, pv);
+            let remainingBalance = pv;
+
+            for (let i = 0; i < paymentsMade; i++) {
+                const interest = remainingBalance * monthlyRate;
+                const principal = monthlyPayment - interest;
+                remainingBalance -= principal;
+            }
+
+            return remainingBalance;
+        }
+
+        function calculateLoanWithLowerRate(data) {
+            const rows = [];
+            let remainingBalance = data.credit;
+            let totalInterest = 0;
+            let totalPrincipal = 0;
+            let totalMonthlyRates = 0;
+            let totalAdvancePayments = 0;
+            let totalMonthlyRatesPayment = 0;
+            let totalInsurancePayment = 0;
+            let grandTotalMonth = 0;
+            let adjustedMonthlyAdvancePayment = data.monthlyAdvancePayment;
+
+            const originalRateFixed = calculatePMT(
+                data.fixedRate,
+                data.months,
+                data.credit,
+            );
+            let originalRateVariable;
+
+            const remainingBalanceAfterFixed = calculateRemainingBalance(
+                data.fixedRate,
+                data.months,
+                data.credit,
+                data.fixedRatePeriod,
+            );
+
+            originalRateVariable = calculatePMT(
+                data.ircc + data.margin,
+                data.months - data.fixedRatePeriod,
+                remainingBalanceAfterFixed,
+            );
+
+            for (let month = 1; month <= data.months; month++) {
+                const rate =
+                    month <= data.fixedRatePeriod ? data.fixedRate : data.ircc + data.margin;
+                let remainingTerm = data.months - month + 1;
+                const originalRate =
+                    month <= data.fixedRatePeriod ? originalRateFixed : originalRateVariable;
+                let newRate = calculatePMT(rate, remainingTerm, remainingBalance);
+
+                let monthlyInterest = (remainingBalance * rate) / 12 / 100;
+                let principal = newRate - monthlyInterest;
+                let advancePayment = data.monthlyAdvancePayment + (originalRate - newRate);
+
+                if (month >= data.fixedRatePeriod + 1) {
+                    advancePayment = Math.max(
+                        0,
+                        data.monthlyAdvancePayment + (originalRateFixed - newRate),
+                    );
+                }
+
+                let totalMonthlyPayment = newRate + advancePayment;
+
+                const insurance = (remainingBalance * data.insurancePercent) / 100;
+
+                if (remainingBalance <= newRate + advancePayment) {
+                    newRate = remainingBalance;
+                    principal = newRate - monthlyInterest;
+                    advancePayment = newRate - principal;
+                    totalMonthlyPayment = newRate + advancePayment;
+                    remainingBalance = 0;
+                    remainingTerm = 1;
+                    totalInterest += monthlyInterest;
+                    totalPrincipal += principal;
+                    totalMonthlyRates += newRate;
+                    totalAdvancePayments += advancePayment;
+                    totalMonthlyRatesPayment += totalMonthlyPayment;
+                    totalInsurancePayment += insurance;
+                    grandTotalMonth += totalMonthlyPayment + insurance;
+                } else {
+                    remainingBalance = Math.max(
+                        0,
+                        remainingBalance - principal - advancePayment,
+                    );
+                    totalInterest += monthlyInterest;
+                    totalPrincipal += principal;
+                    totalMonthlyRates += newRate;
+                    totalAdvancePayments += advancePayment;
+                    totalMonthlyRatesPayment += totalMonthlyPayment;
+                    totalInsurancePayment += insurance;
+                    grandTotalMonth += totalMonthlyPayment + insurance;
+                }
+
+                rows.push({
+                    month,
+                    remainingBalance,
+                    monthlyPayment: newRate,
+                    principal,
+                    interest: monthlyInterest,
+                    rate,
+                    margin: month <= data.fixedRatePeriod ? 0 : data.margin,
+                    ircc: month <= data.fixedRatePeriod ? 0 : data.ircc,
+                    advancePayment,
+                    totalMonthlyPayment,
+                    insurance,
+                    totalPayment: totalMonthlyPayment + insurance,
+                    maturity: remainingTerm - 1,
+                });
+
+                if (remainingBalance <= 0) {
+                    break;
+                }
+            }
+
+            rows.push({
+                month: "TOTALURI",
+                remainingBalance: `<strong style="color: #228B22;">--</strong>`,
+                monthlyPayment: `<strong style="color: #228B22;">${totalMonthlyRates.toFixed(2)}</strong>`,
+                principal: `<strong style="color: #228B22;">${totalPrincipal.toFixed(2)}</strong>`,
+                interest: `<strong style="color: #228B22;">${totalInterest.toFixed(2)}</strong>`,
+                rate: `<strong style="color: #228B22;">--</strong>`,
+                margin: `<strong style="color: #228B22;">--</strong>`,
+                ircc: `<strong style="color: #228B22;">--</strong>`,
+                advancePayment: `<strong style="color: #228B22;">${totalAdvancePayments.toFixed(2)}</strong>`,
+                totalMonthlyPayment: `<strong style="color: #228B22;">${totalMonthlyRatesPayment.toFixed(2)}</strong>`,
+                insurance: `<strong style="color: #228B22;">${totalInsurancePayment.toFixed(2)}</strong>`,
+                totalPayment: `<strong style="color: #228B22;">${grandTotalMonth.toFixed(2)}</strong>`,
+                maturity: `<strong style="color: #228B22;">--</strong>`,
+            });
+
+            return rows;
+        }
+
+        function calculateLoanWithLowerPeriod(data) {
+            const rows = [];
+            let remainingBalance = data.credit;
+            let initialRate = calculatePMT(data.fixedRate, data.months, data.credit);
+            let totalInterest = 0;
+            let totalPrincipal = 0;
+            let totalMonthlyRates = 0;
+            let totalAdvancePayments = 0;
+            let totalMonthlyRatesPayment = 0;
+            let totalInsurancePayment = 0;
+            let grandTotalMonth = 0;
+            let adjustedMonthlyAdvancePayment = data.monthlyAdvancePayment;
+            let maxTotalMonthlyPayment = 0;
+
+            for (let month = 1; month <= data.months; month++) {
+                const rate =
+                    month <= data.fixedRatePeriod ? data.fixedRate : data.ircc + data.margin;
+
+                if (month === data.fixedRatePeriod + 1) {
+                    const lastFixedRateRow = rows[data.fixedRatePeriod - 1];
+                    const leftMaturity = lastFixedRateRow.maturity;
+                    remainingBalance = lastFixedRateRow.remainingBalance;
+                    initialRate = calculatePMT(rate, leftMaturity, remainingBalance);
+
+                    maxTotalMonthlyPayment = lastFixedRateRow.totalMonthlyPayment;
+                }
+
+                if (month >= data.fixedRatePeriod + 1) {
+                    adjustedMonthlyAdvancePayment = Math.max(
+                        0,
+                        maxTotalMonthlyPayment - initialRate,
+                    );
+                }
+
+                let monthlyInterest = (remainingBalance * rate) / 12 / 100;
+                let principal = initialRate - monthlyInterest;
+                let advancePayment = Math.min(
+                    adjustedMonthlyAdvancePayment,
+                    remainingBalance - principal,
+                );
+                let leftMaturity = data.months - month;
+
+                if (advancePayment > 0) {
+                    leftMaturity = calculateRemainingTerm(
+                        remainingBalance,
+                        rate,
+                        initialRate,
+                        advancePayment,
+                    );
+                }
+
+                let totalMonthlyPayment = initialRate + advancePayment;
+
+                const insurance = (remainingBalance * data.insurancePercent) / 100;
+
+                if (remainingBalance <= initialRate) {
+                    initialRate = remainingBalance;
+                    principal = initialRate - monthlyInterest;
+                    advancePayment = initialRate - principal;
+                    adjustedMonthlyAdvancePayment = initialRate - principal;
+                    totalMonthlyPayment = initialRate + advancePayment;
+                    remainingBalance = 0;
+                    leftMaturity = 0;
+                    totalMonthlyRates += initialRate;
+                    totalPrincipal += principal;
+                    totalInterest += monthlyInterest;
+                    totalAdvancePayments += advancePayment;
+                    totalMonthlyRatesPayment += totalMonthlyPayment;
+                    totalInsurancePayment += insurance;
+                    grandTotalMonth += totalMonthlyPayment + insurance;
+                } else {
+                    remainingBalance = Math.max(
+                        0,
+                        remainingBalance - principal - advancePayment,
+                    );
+                    totalMonthlyRates += initialRate;
+                    totalPrincipal += principal;
+                    totalInterest += monthlyInterest;
+                    totalAdvancePayments += advancePayment;
+                    totalMonthlyRatesPayment += totalMonthlyPayment;
+                    totalInsurancePayment += insurance;
+                    grandTotalMonth += totalMonthlyPayment + insurance;
+                }
+
+                rows.push({
+                    month,
+                    remainingBalance,
+                    monthlyPayment: initialRate,
+                    principal,
+                    interest: monthlyInterest,
+                    rate,
+                    margin: month <= data.fixedRatePeriod ? 0 : data.margin,
+                    ircc: month <= data.fixedRatePeriod ? 0 : data.ircc,
+                    advancePayment,
+                    totalMonthlyPayment,
+                    insurance,
+                    totalPayment: totalMonthlyPayment + insurance,
+                    maturity: leftMaturity,
+                });
+
+                if (remainingBalance <= 0) {
+                    break;
+                }
+            }
+
+            rows.push({
+                month: "TOTALURI",
+                remainingBalance: `<strong style="color: #228B22;">--</strong>`,
+                monthlyPayment: `<strong style="color: #228B22;">${totalMonthlyRates.toFixed(2)}</strong>`,
+                principal: `<strong style="color: #228B22;">${totalPrincipal.toFixed(2)}</strong>`,
+                interest: `<strong style="color: #228B22;">${totalInterest.toFixed(2)}</strong>`,
+                rate: `<strong style="color: #228B22;">--</strong>`,
+                margin: `<strong style="color: #228B22;">--</strong>`,
+                ircc: `<strong style="color: #228B22;">--</strong>`,
+                advancePayment: `<strong style="color: #228B22;">${totalAdvancePayments.toFixed(2)}</strong>`,
+                totalMonthlyPayment: `<strong style="color: #228B22;">${totalMonthlyRatesPayment.toFixed(2)}</strong>`,
+                insurance: `<strong style="color: #228B22;">${totalInsurancePayment.toFixed(2)}</strong>`,
+                totalPayment: `<strong style="color: #228B22;">${grandTotalMonth.toFixed(2)}</strong>`,
+                maturity: `<strong style="color: #228B22;">--</strong>`,
+            });
+
+            return rows;
+        }
+
+        function renderTable(data) {
+            const table = document.getElementById("loanTable");
+            table.innerHTML = "";
+
+            const headers = [
+                "Luna",
+                "Ramas de Plata",
+                "Rata Lunara de Plata",
+                "Principal",
+                "Dobanda",
+                "Rata Dobanzii",
+                "Marja Fixa a Bancii",
+                "IRCC",
+                "Rambursare Anticipata",
+                "Rata Lunara",
+                "Comision lunar",
+                "Total / Luna",
+                "Maturitate",
+            ];
+
+            let headerRow = table.insertRow();
+            headers.forEach((header) => {
+                let th = document.createElement("th");
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+
+            let rows = [];
+            if (data.calculationType === "scaderea_ratei") {
+                rows = calculateLoanWithLowerRate(data);
+            } else if (data.calculationType === "scaderea_perioadei") {
+                rows = calculateLoanWithLowerPeriod(data);
+            }
+
+            rows.forEach((row) => {
+                let tr = table.insertRow();
+                Object.entries(row).forEach(([key, value]) => {
+                    let td = tr.insertCell();
+                    if (key === "month") {
+                        td.textContent = value.toString();
+                    } else if (typeof value === "number") {
+                        td.textContent = value.toFixed(2);
+                    } else {
+                        td.innerHTML = value;
+                    }
+                });
+            });
+        }
+
+        function exportTableToCSV(data) {
+            const table = document.getElementById("loanTable");
+            const now = new Date();
+            const currentTimestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + now.toTimeString().split(' ')[0].replace(/:/g, '-');
+            let fileName = "loanoutput.csv";
+
+            if (!table || table.rows.length <= 1) {
+                console.error("Loan table is empty. Cannot export to CSV.");
+                return;
+            }
+
+            let csv = [];
+            const rows = table.querySelectorAll("tr");
+
+            const headers = [];
+            const headerCells = rows[0].querySelectorAll("th");
+            headerCells.forEach((headerCell) => {
+                headers.push(headerCell.textContent);
+            });
+            csv.push(headers.join(","));
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = [];
+                const cells = rows[i].querySelectorAll("td");
+                cells.forEach((cell) => {
+                    row.push(cell.textContent);
+                });
+                csv.push(row.join(","));
+            }
+
+            const csvString = csv.join("\n");
+            const blob = new Blob([csvString], { type: "text/csv" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+
+            if (data.calculationType === "scaderea_ratei") {
+                fileName = "export_scadere_rata_" + currentTimestamp + ".csv";
+            } else if (data.calculationType === "scaderea_perioadei") {
+                fileName = "export_scadere_perioada_" + currentTimestamp + ".csv";
+            }
+
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.getElementById("exportButton").addEventListener("click", function () {
+            const formData = new FormData(document.getElementById("loanForm"));
+            const loanData = Object.fromEntries(formData.entries());
+
+            exportTableToCSV(loanData);
+        });
+
+        document
+            .getElementById("calculateButton")
+            .addEventListener("click", function () {
+                const formData = new FormData(document.getElementById("loanForm"));
+                const loanData = Object.fromEntries(formData.entries());
+
+                for (let key in loanData) {
+                    loanData[key] = Number(loanData[key]);
+                }
+
+                loanData.calculationType = document.getElementById("calculationType").value;
+
+                renderTable(loanData);
+            });
+
+    </script>
+</body>
+
+</html>
