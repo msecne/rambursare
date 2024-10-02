@@ -4,6 +4,7 @@
 <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <title>Plata anticipata credite ipotecare</title>
     <style type="text/css">
         body {
@@ -35,6 +36,7 @@
         }
 
         th {
+            font-family: 'Roboto', Arial;
             background-color: #3a3a3a;
             color: #4CAF50;
             position: sticky;
@@ -156,48 +158,52 @@
         <h3>Calculator credite ipotecare</h3>
     </div>
     <form id="loanForm">
-        <label for="credit">Credit:</label>
+        <label for="credit">Valoarea credituluit:</label>
         <input type="number" id="credit" name="credit" value="250000" required>
-        <label for="months">Perioada (luni):</label>
+        <label for="months">Durată credit (luni):</label>
         <input type="number" id="months" name="months" value="360" required>
-        <label for="fixedRate">Rata fixa (%):</label>
+        <label for="fixedRate">Dobândă fixă (%):</label>
         <input type="number" id="fixedRate" name="fixedRate" value="5.79" step="0.01" required>
-        <label for="fixedRatePeriod">Perioada rata fixa (luni):</label>
+        <label for="fixedRatePeriod">Perioadă dobândă fixă (luni):</label>
         <input type="number" id="fixedRatePeriod" name="fixedRatePeriod" value="60" required>
         <label for="ircc">IRCC (%):</label>
         <input type="number" id="ircc" name="ircc" value="5.99" step="0.01" required>
-        <label for="margin">Marja (%):</label>
+        <label for="margin">Marja băncii (%):</label>
         <input type="number" id="margin" name="margin" value="2.29" step="0.01" required>
         <label for="insurancePercent">Asigurare / comision (%):
             <span class="tooltip-container">
                 <span class="infopoint"
                     style="font-size: 16px; padding: 0; border: none; background: none; color: #4CAF50; cursor: default; margin-left: 5px; display: inline;">info</span>
-                <span class="tooltip-text">Comision reprezentand asigurarea de viata sau comisionul de administrare
-                    lunara a creditului ca procent din soldul lunar.</span>
+                <span class="tooltip-text">Comision reprezentând asigurarea de viață sau comisionul de administrare
+                    lunară a creditului ca procent din soldul lunar.</span>
             </span>
         </label>
         <input type="number" id="insurancePercent" name="insurancePercent" value="0" step="0.01" required>
         <label for="monthlyAdvancePayment">
-            Plata anticipata lunara:
+            Valoare plată anticipată lunară:
             <span class="tooltip-container">
                 <span class="infopoint"
                     style="font-size: 16px; padding: 0; border: none; background: none; color: #4CAF50; cursor: default; margin-left: 5px; display: inline;">info</span>
-                <span class="tooltip-text">Suma platita anticipat lunar poate creste sau scadea in functie de rata
-                    totala, astfel incat sa se mentina pe cat posibil o rata fixa pe toata perioada creditului.</span>
+                <span class="tooltip-text">Suma plătită anticipat lunar poate crește sau scădea în funcție de rata
+                    totală, astfel încât să se mențină pe cât posibil o rată fixă pe toată perioada creditului.</span>
             </span>
         </label>
         <input type="number" id="monthlyAdvancePayment" name="monthlyAdvancePayment" value="500" required>
         <label for="calculationType">Tip calcul:</label>
         <select id="calculationType" name="calculationType" required>
-            <option value="scaderea_perioadei">Scaderea perioadei</option>
-            <option value="scaderea_ratei">Scaderea ratei</option>
-            <option value="rate_descrescatoare">Rate descrescatoare</option>
+            <option value="scaderea_perioadei">Scăderea perioadei</option>
+            <option value="scaderea_ratei">Scăderea ratei</option>
+            <option value="rate_descrescatoare">Rate descrescătoare</option>
         </select>
         <div class="button-container">
-            <button type="button" id="calculateButton">Calculeaza</button>
-            <button type="button" id="exportButton">Export in CSV</button>
+            <button type="button" id="calculateButton">Calculează</button>
+            <button type="button" id="exportButton">Exportă în CSV</button>
         </div>
     </form>
+    <table id="summaryTable">
+    </table>
+    <br>
+    <br>
     <table id="loanTable">
     </table>
 
@@ -246,8 +252,75 @@
             return decimalPart === '00' ? formattedInteger : `${formattedInteger},${decimalPart}`;
         }
 
+        function calculateTotalPaid(initialRate, newRate, nper, pv, changePeriod, insurance) {
+            let totalPaid = 0;
+            let remainingBalance = pv;
+            let totalInsurancePaid = 0;
+
+            for (let month = 1; month <= nper; month++) {
+                const currentRate = month <= changePeriod ? initialRate : newRate;
+                const monthlyInterestRate = currentRate / 12 / 100;
+
+                const monthlyPayment = calculatePMT(currentRate, nper - month + 1, remainingBalance);
+
+                totalPaid += monthlyPayment;
+                totalInsurancePaid += (remainingBalance * insurance) / 100;
+
+                remainingBalance -= (monthlyPayment - (remainingBalance * monthlyInterestRate));
+
+                if (remainingBalance <= 0) {
+                    break;
+                }
+            }
+
+            return {
+                totalPaid: Math.round(totalPaid * 100) / 100,
+                totalInsurancePaid: Math.round(totalInsurancePaid * 100) / 100,
+            };
+        }
+
+
+        function calculateTotalWithReducingRate(credit, months, initialRate, newRate, changePeriod, insurancePercent) {
+            let principal = credit / months;
+            let remainingBalance = credit;
+            let totalInterest = 0;
+            let totalMonthlyRatesPayment = 0;
+            let totalInsurancePayment = 0;
+
+            for (let month = 1; month <= months; month++) {
+                const rate = month <= changePeriod ? initialRate : newRate;
+
+                let monthlyInterest = (remainingBalance * rate) / 12 / 100;
+                let loanRate = monthlyInterest + principal;
+
+                if (remainingBalance - principal < 0) {
+                    principal = remainingBalance;
+                }
+
+                let totalMonthlyPayment = loanRate;
+                const insurance = (remainingBalance * insurancePercent) / 100;
+
+                remainingBalance = Math.max(0, remainingBalance - principal);
+
+                if (remainingBalance >= 0) {
+                    totalMonthlyRatesPayment += totalMonthlyPayment;
+                    totalInsurancePayment += insurance;
+                }
+
+                if (remainingBalance <= 0) {
+                    break;
+                }
+            }
+
+            return {
+                totalPaid: Math.round(totalMonthlyRatesPayment * 100) / 100,
+                totalInsurancePaid: Math.round(totalInsurancePayment * 100) / 100,
+            };
+        }
+
         function calculateLoanWithReducingRate(data) {
             const rows = [];
+            const summaryRows = [];
             let principal = data.credit / data.months;
             let remainingBalance = data.credit;
             let totalInterest = 0;
@@ -288,7 +361,7 @@
                 if (remainingBalance - principal < 0) {
                     principal = remainingBalance;
                 }
-                
+
                 if (remainingBalance - principal - adjustedMonthlyAdvancePayment < 0) {
                     adjustedMonthlyAdvancePayment = Math.max(0, remainingBalance - principal);
                 }
@@ -349,11 +422,31 @@
                 maturity: `<strong style="color: #228B22;">--</strong>`,
             });
 
-            return rows;
+            // const originalTotals = calculateTotalPaid(data.fixedRate, data.ircc + data.margin, data.months, data.credit, data.fixedRatePeriod, data.insurancePercent);
+            const originalTotals = calculateTotalWithReducingRate(data.credit, data.months, data.fixedRate, data.ircc + data.margin, data.fixedRatePeriod, data.insurancePercent);
+            originalTotalPaid = originalTotals.totalPaid;
+            originalInsurancePaid = originalTotals.totalInsurancePaid;
+            savedInRatesTotal = Math.round((originalTotalPaid - totalMonthlyRatesPayment) * 100) / 100;
+            savedInsurance = Math.round((originalInsurancePaid - totalInsurancePayment) * 100) / 100;
+            savedInTotal = savedInRatesTotal + savedInsurance;
+
+            summaryRows.push({
+                originalTotalPaid: originalTotalPaid,
+                originalInsurancePaid: originalInsurancePaid,
+                savedInRatesTotal: savedInRatesTotal,
+                savedInsurance: savedInsurance,
+                savedInTotal: savedInTotal,
+            });
+
+            return {
+                rows,
+                summaryRows,
+            };
         }
 
         function calculateLoanWithLowerRate(data) {
             const rows = [];
+            const summaryRows = [];
             let remainingBalance = data.credit;
             let totalInterest = 0;
             let totalPrincipal = 0;
@@ -472,11 +565,30 @@
                 maturity: `<strong style="color: #228B22;">--</strong>`,
             });
 
-            return rows;
+            const originalTotals = calculateTotalPaid(data.fixedRate, data.ircc + data.margin, data.months, data.credit, data.fixedRatePeriod, data.insurancePercent);
+            originalTotalPaid = originalTotals.totalPaid;
+            originalInsurancePaid = originalTotals.totalInsurancePaid;
+            savedInRatesTotal = Math.round((originalTotalPaid - totalMonthlyRatesPayment) * 100) / 100;
+            savedInsurance = Math.round((originalInsurancePaid - totalInsurancePayment) * 100) / 100;
+            savedInTotal = savedInRatesTotal + savedInsurance;
+
+            summaryRows.push({
+                originalTotalPaid: originalTotalPaid,
+                originalInsurancePaid: originalInsurancePaid,
+                savedInRatesTotal: savedInRatesTotal,
+                savedInsurance: savedInsurance,
+                savedInTotal: savedInTotal,
+            });
+
+            return {
+                rows,
+                summaryRows,
+            };
         }
 
         function calculateLoanWithLowerPeriod(data) {
             const rows = [];
+            const summaryRows = [];
             let remainingBalance = data.credit;
             let initialRate = calculatePMT(data.fixedRate, data.months, data.credit);
             let totalInterest = 0;
@@ -596,43 +708,86 @@
                 maturity: `<strong style="color: #228B22;">--</strong>`,
             });
 
-            return rows;
+            const originalTotals = calculateTotalPaid(data.fixedRate, data.ircc + data.margin, data.months, data.credit, data.fixedRatePeriod, data.insurancePercent);
+            originalTotalPaid = originalTotals.totalPaid;
+            originalInsurancePaid = originalTotals.totalInsurancePaid;
+            savedInRatesTotal = Math.round((originalTotalPaid - totalMonthlyRatesPayment) * 100) / 100;
+            savedInsurance = Math.round((originalInsurancePaid - totalInsurancePayment) * 100) / 100;
+            savedInTotal = savedInRatesTotal + savedInsurance;
+
+            summaryRows.push({
+                originalTotalPaid: originalTotalPaid,
+                originalInsurancePaid: originalInsurancePaid,
+                savedInRatesTotal: savedInRatesTotal,
+                savedInsurance: savedInsurance,
+                savedInTotal: savedInTotal,
+            });
+
+            return {
+                rows,
+                summaryRows,
+            };
         }
 
         function renderTable(data) {
             const table = document.getElementById("loanTable");
+            const summaryTable = document.getElementById("summaryTable");
+            summaryTable.innerHTML = "";
             table.innerHTML = "";
 
             const headers = [
                 "Luna",
-                "Ramas de Plata",
-                "Rata Lunara de Plata",
+                "Rămas de plată",
+                "Rata lunară de plată",
                 "Principal",
-                "Dobanda",
-                "Rata Dobanzii",
-                "Marja Fixa a Bancii",
+                "Dobândă",
+                "Rata dobânzii",
+                "Marja fixă a băncii",
                 "IRCC",
-                "Rambursare Anticipata",
-                "Rata Lunara",
-                "Comision lunar",
-                "Total / Luna",
+                "Rambursare anticipată",
+                "Rata lunară",
+                "Comision / asigurare lunară",
+                "Total / Lună",
                 "Maturitate",
             ];
 
+            const summaryHeaders = [
+                "Suma totală plătită inițial<br><span style='color: #f0f0f0; font-size: small; font-style: italic; font-weight: normal;'>*fără plăți anticipate</span>",
+                "Asigurare /comision total plătit <br><span style='color: #f0f0f0; font-size: small; font-style: italic; font-weight: normal;'>*fără plăți anticipate</span>",
+                "Economie din ratele inițiale<br><span style='color: #f0f0f0; font-size: small; font-style: italic; font-weight: normal;'>*cu plăți anticipate</span>",
+                "Economie din asigurare / comision inițial<br><span style='color: #f0f0f0; font-size: small; font-style: italic; font-weight: normal;'>*cu plăți anticipate</span>",
+                "Economie totală<br><span style='color: #f0f0f0; font-size: small; font-style: italic; font-weight: normal;'>*cu plăți anticipate</span>",
+            ];
+
             let headerRow = table.insertRow();
+            let summaryHeaderRow = summaryTable.insertRow();
+
             headers.forEach((header) => {
                 let th = document.createElement("th");
                 th.textContent = header;
                 headerRow.appendChild(th);
             });
 
+            summaryHeaders.forEach((header) => {
+                let th = document.createElement("th");
+                th.innerHTML = header;
+                summaryHeaderRow.appendChild(th);
+            });
+
             let rows = [];
+            let summaryRows = [];
             if (data.calculationType === "scaderea_ratei") {
-                rows = calculateLoanWithLowerRate(data);
+                result = calculateLoanWithLowerRate(data);
+                rows = result.rows;
+                summaryRows = result.summaryRows;
             } else if (data.calculationType === "scaderea_perioadei") {
-                rows = calculateLoanWithLowerPeriod(data);
+                result = calculateLoanWithLowerPeriod(data);
+                rows = result.rows;
+                summaryRows = result.summaryRows;
             } else if (data.calculationType === "rate_descrescatoare") {
-                rows = calculateLoanWithReducingRate(data);
+                result = calculateLoanWithReducingRate(data);
+                rows = result.rows;
+                summaryRows = result.summaryRows;
             }
 
             rows.forEach((row) => {
@@ -642,6 +797,18 @@
                     if (key === "month") {
                         td.textContent = value.toString();
                     } else if (typeof value === "number") {
+                        td.textContent = formatNumber(value);
+                    } else {
+                        td.innerHTML = value;
+                    }
+                });
+            });
+
+            summaryRows.forEach((row) => {
+                let tr = summaryTable.insertRow();
+                Object.entries(row).forEach(([key, value]) => {
+                    let td = tr.insertCell();
+                    if (typeof value === "number") {
                         td.textContent = formatNumber(value);
                     } else {
                         td.innerHTML = value;
